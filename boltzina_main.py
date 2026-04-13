@@ -225,7 +225,7 @@ class Boltzina:
             docked_ligands_dir = ligand_output_dir / "docked_ligands"
             for pose_idx in self.pose_idxs:
                 complex_file = docked_ligands_dir / f"docked_ligand_{pose_idx}_{self.ligand_chain_id}_complex_fix.cif"
-                fname = f"{self.fname}_{ligand_output_dir.stem}_{pose_idx}"
+                fname = f"{self.fname}_{idx}_{pose_idx}"
                 affinity_file = self.output_dir / "boltz_out" / "predictions" / fname / f"affinity_{fname}.json"
                 pre_affinity_file = self.output_dir / "boltz_out" / "predictions" / fname / f"pre_affinity_{fname}.npz"
                 if affinity_file.exists() and not self.boltz_override:
@@ -474,15 +474,14 @@ class Boltzina:
         if self.mol_dict:
             mol = self.mol_dict[ligand_path.stem]
         else:
-            mol = Chem.MolFromPDBFile(ligand_path)
+            mol = Chem.MolFromPDBFile(str(ligand_path))
+            if mol is None:
+                raise ValueError(f"Failed to read PDB file {ligand_path}")
             for atom in mol.GetAtoms():
                 pdb_info = atom.GetPDBResidueInfo()
                 if pdb_info:
                     atom_name = pdb_info.GetName().strip().upper()
                     atom.SetProp("name", atom_name)
-
-        if mol is None:
-            raise ValueError(f"Failed to read PDB file {ligand_path}")
 
         for pose_idx in self.pose_idxs:
             fname = f"{self.fname}_{ligand_output_dir.stem}_{pose_idx}"
@@ -796,7 +795,7 @@ class Boltzina:
             complex_file = ligand_output_dir / "docked_ligands" / f"{base_name}_{self.ligand_chain_id}_complex_fix.cif"
 
             for pose_idx in self.pose_idxs:
-                fname = f"{self.fname}_{ligand_output_dir.stem}_{pose_idx}"
+                fname = f"{self.fname}_{ligand_idx}_{pose_idx}"
                 affinity_file = self.output_dir / "boltz_out" / "predictions" / fname / f"affinity_{fname}.json"
                 pre_affinity_file = self.output_dir / "boltz_out" / "predictions" / fname / f"pre_affinity_{fname}.npz"
                 if affinity_file.exists() and not self.boltz_override:

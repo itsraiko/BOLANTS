@@ -29,7 +29,7 @@ def prepare_mol(smiles, output_path):
             atom_name = atom.GetSymbol().upper() + str(can_idx + 1)
             if len(atom_name) > 4:
                 msg = (
-                    f"{seq} has an atom with a name longer than "
+                    f"{smiles} has an atom with a name longer than "
                     f"4 characters: {atom_name}."
                 )
                 raise ValueError(msg)
