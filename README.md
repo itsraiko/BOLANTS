@@ -5,33 +5,41 @@
 This project is a fork of [Boltzina](https://github.com/ohuelab/boltzina), replacing AutoDock Vina with PLANTS as the docking engine.
 
 ```mermaid
-flowchart LR
-    subgraph Inputs
-        A[protein.yaml]
-        B[protein.pdb]
-        C[Ligand SMILES]
+flowchart TD
+    subgraph IN["📥  Inputs"]
+        direction LR
+        A["📄 protein.yaml\n(sequence + ligand SMILES)"]
+        B["🧬 protein.pdb\n(receptor structure)"]
+        C["🔬 Ligand SMILES\n(one per compound)"]
     end
 
-    subgraph Preparation
-        A -->|boltz predict| D[manifest.json\n+ constraints]
-        B -->|SPORES / obabel| E[receptor.mol2]
-        C -->|ligand_preparation.py| F[ligand.pdb]
-        F -->|obabel| G[ligand.mol2]
+    subgraph PREP["⚙️  Preparation"]
+        direction TB
+        A -->|"boltz predict\n--use_msa_server"| D["📋 manifest.json\n+ constraints.npz"]
+        B -->|"SPORES / obabel"| E["🗂️ receptor.mol2"]
+        C -->|"ligand_preparation.py"| F["📁 ligand.pdb\n(3D conformer, unique atom names)"]
+        F -->|"obabel"| G["🗂️ ligand.mol2"]
     end
 
-    subgraph Docking["PLANTS Docking"]
-        E --> H((PLANTS))
-        G --> H
-        H --> I[docked_ligands.mol2\nTOTAL_SCORE]
+    subgraph DOCK["🌿  PLANTS Docking"]
+        direction TB
+        E --> PL(["⚡ PLANTS\nchemplp scoring"])
+        G --> PL
+        PL --> I["📦 docked_ligands.mol2\nranking.csv  →  TOTAL_SCORE"]
     end
 
-    subgraph Scoring["Boltz-2 Affinity Scoring"]
-        I -->|obabel + maxit| J[complex.cif]
-        D --> K((Boltz-2))
-        J --> K
+    subgraph SCORE["🤖  Boltz-2 Affinity Scoring"]
+        direction TB
+        I -->|"obabel + maxit"| J["📄 complex.cif\n(protein–ligand complex)"]
+        D --> BZ(["🧠 Boltz-2\naffinity model"])
+        J --> BZ
     end
 
-    K --> L[boltzina_results.csv]
+    BZ --> OUT["📊 boltzina_results.csv\naffinity_pred_value · docking_score"]
+
+    IN --> PREP
+    PREP --> DOCK
+    DOCK --> SCORE
 ```
 
 ## What changed from Boltzina
