@@ -502,16 +502,46 @@ class Boltzina:
                 shutil.copy(source_constraints_file, target_constraints_file)
         return
 
+    def _get_ligand_mw(self, ligand_idx: int) -> float:
+        """Compute molecular weight of ligand from its RDKit mol object."""
+        try:
+            from rdkit.Chem import Descriptors
+            ligand_output_dir = self.output_dir / "out" / str(ligand_idx)
+            extra_mols_dir = ligand_output_dir / "boltz_out" / "mols"
+            ligand_mol_pkl = extra_mols_dir / f"{self.base_ligand_name}.pkl"
+            if ligand_mol_pkl.exists():
+                with open(ligand_mol_pkl, "rb") as f:
+                    mol = pickle.load(f)
+                if mol is not None:
+                    return Descriptors.MolWt(mol)
+        except Exception:
+            pass
+        return 0.0
+
     def _update_manifest(self, record_ids: List[str]) -> None:
         manifest = copy.deepcopy(self.manifest)
         record = [record for record in manifest["records"] if record["id"] == self.fname][0]
+
+        # Find the ligand chain_id (mol_type=3) to set affinity
+        ligand_chain_id = None
+        for chain in record.get("chains", []):
+            if chain.get("mol_type") == 3:
+                ligand_chain_id = chain["chain_id"]
+                break
+
         manifest["records"] = []
         for record_id in record_ids:
             new_record = copy.deepcopy(record)
-            # for chain_id, _ in enumerate(new_record["chains"]):
-            #     if new_record["chains"][chain_id]["msa_id"] != -1:
-            #         new_record["chains"][chain_id]["msa_id"] = f"{record_id}_{chain_id}"
             new_record["id"] = record_id
+            # Set affinity so the tokenizer marks the ligand chain with affinity_mask=True
+            if ligand_chain_id is not None and new_record.get("affinity") is None:
+                # Parse ligand_idx from record_id: fname_{ligand_idx}_{pose_idx}
+                try:
+                    ligand_idx = int(record_id.split("_")[-2])
+                except (ValueError, IndexError):
+                    ligand_idx = 0
+                mw = self._get_ligand_mw(ligand_idx)
+                new_record["affinity"] = {"chain_id": ligand_chain_id, "mw": mw}
             manifest["records"].append(new_record)
         with open(self.output_dir / "boltz_out" / "processed" / f"manifest.json", "w") as f:
             json.dump(manifest, f, indent=4)
@@ -552,7 +582,6 @@ class Boltzina:
                 path=str(complex_file),
                 mols=mols_for_parsing,
                 moldir=str(self.cache_dir / "mols"),  # boltz cache: has all standard CCD residues
-                call_compute_interfaces=False
             )
 
             # Save structure data
