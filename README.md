@@ -4,7 +4,35 @@
 
 This project is a fork of [Boltzina](https://github.com/ohuelab/boltzina), replacing AutoDock Vina with PLANTS as the docking engine.
 
-![Pipeline](https://arxiv.org/html/2508.17555v1/x1.png)
+```mermaid
+flowchart LR
+    subgraph Inputs
+        A[protein.yaml]
+        B[protein.pdb]
+        C[Ligand SMILES]
+    end
+
+    subgraph Preparation
+        A -->|boltz predict| D[manifest.json\n+ constraints]
+        B -->|SPORES / obabel| E[receptor.mol2]
+        C -->|ligand_preparation.py| F[ligand.pdb]
+        F -->|obabel| G[ligand.mol2]
+    end
+
+    subgraph Docking["PLANTS Docking"]
+        E --> H((PLANTS))
+        G --> H
+        H --> I[docked_ligands.mol2\nTOTAL_SCORE]
+    end
+
+    subgraph Scoring["Boltz-2 Affinity Scoring"]
+        I -->|obabel + maxit| J[complex.cif]
+        D --> K((Boltz-2))
+        J --> K
+    end
+
+    K --> L[boltzina_results.csv]
+```
 
 ## What changed from Boltzina
 
