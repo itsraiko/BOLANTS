@@ -1,0 +1,17 @@
+[project]
+name = "boltzina-env"
+version = "0.1.0"
+description = "Environment for boltzina"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "boltz[cuda]>=2.2.0",
+    "openbabel-wheel>=3.1.1.22",
+    "pdb-tools>=2.5.0",
+    "triton==3.3.0",
+    "meeko>=0.6.1",
+    "prody>=2.6.1"
+]
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["*"]
