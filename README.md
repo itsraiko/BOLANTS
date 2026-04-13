@@ -74,13 +74,38 @@ Then set `plants_bin` in your `config.json`, or add PLANTS to your `PATH`.
 
 > **SPORES** (optional): if installed and in PATH, BOLANTS uses it instead of obabel for better MOL2 atom-type assignment. Download from the same PLANTS repository.
 
-## Usage
+## Quick Start
+
+### Step 1 — Prepare input files automatically
+
+If you have a protein PDB, a SMILES file, and the binding site coordinates:
 
 ```bash
-python run.py config.json --num_workers 4 --float32_matmul_precision medium
+python prepare.py \
+    --protein  protein.pdb \
+    --smiles   ligands.smi \
+    --center   X Y Z \
+    --output   my_run \
+    --plants_bin /path/to/PLANTS
+```
+
+SMILES file format (`ligands.smi`):
+```
+O=C(N...)c1n...   ZINC000343638897
+CC(=O)Nc1...      ZINC000012345678
+```
+
+This generates `my_run/config.json` and all required files automatically.
+
+### Step 2 — Run
+
+```bash
+python run.py my_run/config.json --float32_matmul_precision medium
 ```
 
 For GPUs with limited VRAM (e.g. RTX 4060), use `--float32_matmul_precision medium` to avoid OOM errors.
+
+Results are saved to `my_run/results/boltzina_results.csv`.
 
 ## Configuration File
 
