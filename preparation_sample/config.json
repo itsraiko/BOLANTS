@@ -1,0 +1,18 @@
+{
+    "work_dir": "sample/CDK2/boltz_results_base",
+    "boltz_yaml": "sample/CDK2/cdk2.yaml",
+    "plants_config": "sample/CDK2/plants_input.conf",
+    "plants_bin": null,
+    "fname": "1ckp_cdk2",
+    "input_ligand_name": "UNL",
+    "output_dir": "preparation_sample/results",
+    "receptor_pdb": "sample/CDK2/1ckp_cdk2.pdb",
+    "prepared_mols_file": "preparation_sample/prepared_mols.pkl",
+    "ligand_files": [
+        "preparation_sample/input_pdbs/CDK2_active_0.pdb",
+        "preparation_sample/input_pdbs/CDK2_active_1.pdb",
+        "preparation_sample/input_pdbs/CDK2_active_2.pdb",
+        "preparation_sample/input_pdbs/CDK2_active_3.pdb",
+        "preparation_sample/input_pdbs/CDK2_active_4.pdb"
+    ]
+}

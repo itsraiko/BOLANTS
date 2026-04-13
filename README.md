@@ -44,9 +44,9 @@ For GPUs with limited VRAM (e.g. RTX 4060), use `--float32_matmul_precision medi
 
 ```json
 {
-    "work_dir": "path/to/boltz2_output",
-    "output_dir": "path/to/results",
     "receptor_pdb": "protein.pdb",
+    "boltz_yaml": "protein.yaml",
+    "output_dir": "path/to/results",
     "plants_config": "plants_input.conf",
     "plants_bin": "/path/to/PLANTS",
     "fname": "my_protein",
@@ -57,6 +57,12 @@ For GPUs with limited VRAM (e.g. RTX 4060), use `--float32_matmul_precision medi
     ]
 }
 ```
+
+**`boltz_yaml`** (recommended): BOLANTS will automatically run `boltz predict` before docking if the Boltz-2 output does not yet exist. No need to run it manually.
+
+**`work_dir`** (optional): If you have already run `boltz predict` and want to reuse the output, set this to the boltz results directory (e.g. `boltz_results_base/boltz_results_myprotein`). If omitted, BOLANTS derives it from `boltz_yaml`.
+
+**`use_msa_server`** (optional, default `true`): Set to `false` to skip `--use_msa_server` when running `boltz predict`.
 
 **PLANTS config** (`plants_input.conf`):
 ```
@@ -73,12 +79,13 @@ cluster_rmsd        2.0
 ## Pipeline
 
 ```
-1. receptor.pdb  →  receptor.mol2       (SPORES or obabel)
-2. ligand.pdb    →  ligand.mol2         (SPORES or obabel)
-3. PLANTS docking → docked_ligands.mol2 + ranking.csv
-4. MOL2 → PDB → CIF                    (obabel + maxit)
-5. Boltz-2 affinity scoring
-6. boltzina_results.csv
+1. boltz predict protein.yaml           (auto, if boltz_yaml is set)
+2. receptor.pdb  →  receptor.mol2       (SPORES or obabel)
+3. ligand.pdb    →  ligand.mol2         (SPORES or obabel)
+4. PLANTS docking → docked_ligands.mol2 + ranking.csv
+5. MOL2 → PDB → CIF                    (obabel + maxit)
+6. Boltz-2 affinity scoring
+7. boltzina_results.csv
 ```
 
 ## Command Line Options
@@ -91,16 +98,6 @@ cluster_rmsd        2.0
 | `--vina_override` | Re-run docking even if output exists |
 | `--boltz_override` | Re-run Boltz-2 scoring even if output exists |
 | `--keep_intermediate_files` | Don't clean up intermediate files |
-
-## Before Running
-
-You need to run Boltz-2 first to generate `manifest.json` and constraints:
-
-```bash
-boltz predict protein.yaml --out_dir boltz_results_base --use_msa_server
-```
-
-Then set `work_dir` in config.json to that output directory.
 
 ## Reference
 
