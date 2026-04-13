@@ -78,7 +78,7 @@ Then set `plants_bin` in your `config.json`, or add PLANTS to your `PATH`.
 
 ### Step 1 — Prepare input files automatically
 
-If you have a protein PDB, a SMILES file, and the binding site coordinates:
+**Option A — SMILES file:**
 
 ```bash
 python prepare.py \
@@ -95,7 +95,18 @@ O=C(N...)c1n...   ZINC000343638897
 CC(=O)Nc1...      ZINC000012345678
 ```
 
-This generates `my_run/config.json` and all required files automatically.
+**Option B — Structure files (SDF / MOL2 / MOL / PDB):**
+
+```bash
+python prepare.py \
+    --protein  protein.pdb \
+    --ligands  ligand1.sdf ligand2.mol2 ligand3.pdb \
+    --center   X Y Z \
+    --output   my_run \
+    --plants_bin /path/to/PLANTS
+```
+
+Both options generate `my_run/config.json` and all required files automatically.
 
 ### Step 2 — Run
 

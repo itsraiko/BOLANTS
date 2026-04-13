@@ -169,6 +169,63 @@ cluster_rmsd        2.0
     print(f"  PLANTS config yazıldı: {out_path.name}")
 
 
+def read_ligand_files(file_paths: list) -> dict:
+    """SDF / MOL2 / MOL / PDB dosyalarından molekülleri oku: {name: mol}"""
+    try:
+        from rdkit import Chem
+    except ImportError as e:
+        raise ImportError(f"Eksik paket: {e}") from e
+
+    mols = {}
+    for path_str in file_paths:
+        path = Path(path_str)
+        if not path.exists():
+            print(f"  [UYARI] Dosya bulunamadı: {path}")
+            continue
+        ext = path.suffix.lower()
+
+        if ext == ".sdf":
+            supplier = Chem.SDMolSupplier(str(path), removeHs=True)
+            for i, mol in enumerate(supplier):
+                if mol is None:
+                    continue
+                name = mol.GetProp("_Name").strip() if mol.HasProp("_Name") else ""
+                if not name:
+                    name = f"{path.stem}_{i + 1}"
+                # Aynı isim varsa sonuna numara ekle
+                base = name
+                j = 2
+                while name in mols:
+                    name = f"{base}_{j}"
+                    j += 1
+                mols[name] = mol
+        elif ext in (".mol", ".mdl"):
+            mol = Chem.MolFromMolFile(str(path), removeHs=True)
+            if mol is not None:
+                mols[path.stem] = mol
+            else:
+                print(f"  [UYARI] Okunamadı: {path.name}")
+        elif ext == ".mol2":
+            mol = Chem.MolFromMol2File(str(path), removeHs=True)
+            if mol is not None:
+                mols[path.stem] = mol
+            else:
+                print(f"  [UYARI] Okunamadı: {path.name}")
+        elif ext == ".pdb":
+            mol = Chem.MolFromPDBFile(str(path), removeHs=True)
+            if mol is not None:
+                mols[path.stem] = mol
+            else:
+                print(f"  [UYARI] Okunamadı: {path.name}")
+        else:
+            print(f"  [UYARI] Desteklenmeyen format: {ext} ({path.name})")
+
+    if not mols:
+        raise ValueError("Hiçbir ligand okunamadı. Desteklenen formatlar: .sdf, .mol, .mol2, .pdb")
+    print(f"  {len(mols)} ligand okundu.")
+    return mols
+
+
 def prepare_ligands(smiles_dict: dict, ligands_dir: Path) -> list:
     """ligand_preparation.py mantığını inline çalıştır."""
     try:
@@ -226,6 +283,60 @@ def prepare_ligands(smiles_dict: dict, ligands_dir: Path) -> list:
     return pdb_paths
 
 
+def prepare_ligands_from_mols(mols_dict: dict, ligands_dir: Path) -> list:
+    """Önceden yüklenmiş RDKit mol nesnelerinden PDB dosyaları oluştur."""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+        from boltz.data.parse.schema import compute_3d_conformer
+        Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
+    except ImportError as e:
+        raise ImportError(f"Eksik paket: {e}\n'pip install .' çalıştırdığından emin ol.") from e
+
+    pdbs_dir = ligands_dir / "input_pdbs"
+    pdbs_dir.mkdir(parents=True, exist_ok=True)
+
+    out_mols_dict = {}
+    failed = []
+
+    for name, mol in mols_dict.items():
+        out_pdb = pdbs_dir / f"{name}.pdb"
+        try:
+            mol = Chem.AddHs(mol)
+            ok = compute_3d_conformer(mol)
+            if not ok:
+                raise ValueError("3D konformer hesaplanamadı")
+            mol = Chem.RemoveHs(mol)
+
+            canonical_order = AllChem.CanonicalRankAtoms(mol)
+            for atom, can_idx in zip(mol.GetAtoms(), canonical_order):
+                atom_name = atom.GetSymbol().upper() + str(can_idx + 1)
+                atom.SetProp("name", atom_name)
+                info = Chem.AtomPDBResidueInfo()
+                info.SetName(atom_name.rjust(4))
+                info.SetResidueName("UNL")
+                info.SetResidueNumber(1)
+                info.SetChainId("A")
+                info.SetIsHeteroAtom(True)
+                atom.SetMonomerInfo(info)
+
+            Chem.MolToPDBFile(mol, str(out_pdb))
+            out_mols_dict[name] = mol
+
+        except Exception as e:
+            print(f"  [UYARI] {name} hazırlanamadı: {e}")
+            failed.append(name)
+
+    pkl_path = ligands_dir / "prepared_mols.pkl"
+    with open(pkl_path, "wb") as f:
+        pickle.dump(out_mols_dict, f)
+
+    pdb_paths = [str(pdbs_dir / f"{n}.pdb") for n in out_mols_dict]
+    print(f"  Ligandlar hazırlandı: {len(out_mols_dict)}/{len(mols_dict)}"
+          + (f"  ({len(failed)} başarısız)" if failed else ""))
+    return pdb_paths
+
+
 def write_config(out_path: Path, cfg: dict) -> None:
     with open(out_path, "w") as f:
         json.dump(cfg, f, indent=4)
@@ -237,7 +348,10 @@ def main():
         description="BOLANTS — Tüm girdi dosyalarını otomatik hazırla"
     )
     parser.add_argument("--protein",   required=True,  help="Protein PDB dosyası")
-    parser.add_argument("--smiles",    required=True,  help="SMILES dosyası (SMILES ISIM formatı)")
+    lig_group = parser.add_mutually_exclusive_group(required=True)
+    lig_group.add_argument("--smiles", help="SMILES dosyası (SMILES ISIM formatı)")
+    lig_group.add_argument("--ligands", nargs="+",
+                           help="Ligand dosyaları (SDF, MOL2, MOL, PDB — bir veya birden fazla)")
     parser.add_argument("--center",    required=True,  nargs=3, type=float,
                         metavar=("X", "Y", "Z"),        help="Bağlanma cebi merkezi (Å)")
     parser.add_argument("--radius",    default=10.0,   type=float, help="Bağlanma cebi yarıçapı (varsayılan: 10.0)")
@@ -249,14 +363,11 @@ def main():
     args = parser.parse_args()
 
     protein_path = Path(args.protein).resolve()
-    smiles_path  = Path(args.smiles).resolve()
     out_dir      = Path(args.output).resolve()
     cx, cy, cz   = args.center
 
     if not protein_path.exists():
         sys.exit(f"Hata: protein dosyası bulunamadı: {protein_path}")
-    if not smiles_path.exists():
-        sys.exit(f"Hata: SMILES dosyası bulunamadı: {smiles_path}")
 
     # Zinciri otomatik belirle
     chain = args.chain or _list_chains(protein_path)[0]
@@ -265,9 +376,18 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     ligands_dir = out_dir / "ligands"
 
+    using_smiles = args.smiles is not None
+    if using_smiles:
+        smiles_path = Path(args.smiles).resolve()
+        if not smiles_path.exists():
+            sys.exit(f"Hata: SMILES dosyası bulunamadı: {smiles_path}")
+        ligand_source_desc = smiles_path.name
+    else:
+        ligand_source_desc = ", ".join(Path(p).name for p in args.ligands)
+
     print(f"\n=== BOLANTS Hazırlık ===")
     print(f"Protein : {protein_path.name}  (zincir {chain})")
-    print(f"SMILES  : {smiles_path.name}")
+    print(f"Ligandlar: {ligand_source_desc}")
     print(f"Merkez  : ({cx}, {cy}, {cz})  r={args.radius} Å")
     print(f"Çıktı   : {out_dir}\n")
 
@@ -280,10 +400,16 @@ def main():
     print("[2/5] Amino asit dizisi çıkarılıyor...")
     sequence = extract_sequence(clean_pdb, chain)
 
-    # 3. SMILES dosyasını oku
+    # 3. Ligandları oku
     print("[3/5] Ligandlar okunuyor...")
-    smiles_dict = read_smiles_file(smiles_path)
-    first_smiles = next(iter(smiles_dict.values()))
+    if using_smiles:
+        smiles_dict = read_smiles_file(smiles_path)
+        first_smiles = next(iter(smiles_dict.values()))
+    else:
+        from rdkit import Chem
+        mols_dict = read_ligand_files(args.ligands)
+        # YAML için ilk molekülden kanonik SMILES üret
+        first_smiles = Chem.MolToSmiles(next(iter(mols_dict.values())))
 
     # 4. Dosyaları yaz
     print("[4/5] Yapılandırma dosyaları yazılıyor...")
@@ -296,7 +422,10 @@ def main():
 
     # 5. Ligand PDB'leri hazırla
     print("[5/5] Ligand 3D konformerleri hesaplanıyor...")
-    ligand_files = prepare_ligands(smiles_dict, ligands_dir)
+    if using_smiles:
+        ligand_files = prepare_ligands(smiles_dict, ligands_dir)
+    else:
+        ligand_files = prepare_ligands_from_mols(mols_dict, ligands_dir)
 
     # config.json
     config = {
