@@ -2,7 +2,10 @@
 # BOLANTS setup script
 set -e
 
-echo "Installing Boltz-2 model files..."
+echo "Installing Python dependencies..."
+pip install .
+
+echo "Downloading Boltz-2 model weights..."
 python setup_boltzina.py
 
 echo "Installing MAXIT..."

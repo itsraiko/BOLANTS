@@ -57,16 +57,22 @@ flowchart TD
 ```bash
 git clone https://github.com/itsraiko/BOLANTS.git
 cd BOLANTS
-pip install .
+bash setup.sh
 ```
 
-Install PLANTS from: https://github.com/purnawanpp/plants  
-Install Maxit from: https://sw-tools.rcsb.org/apps/MAXIT/
+`setup.sh` does the following automatically:
+1. `pip install .` — installs all Python dependencies (boltz, openbabel, pdb-tools, …)
+2. Downloads Boltz-2 model weights to `~/.boltz/`
+3. Downloads and builds **maxit** from source
 
-Then make sure PLANTS is executable:
+**PLANTS** must be installed separately (platform-specific binary):
 ```bash
+# Download from: https://github.com/purnawanpp/plants
 chmod +x /path/to/PLANTS
 ```
+Then set `plants_bin` in your `config.json`, or add PLANTS to your `PATH`.
+
+> **SPORES** (optional): if installed and in PATH, BOLANTS uses it instead of obabel for better MOL2 atom-type assignment. Download from the same PLANTS repository.
 
 ## Usage
 
